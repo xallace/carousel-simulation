@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kettenkarussell & Zentripetalkraft | Modern Physics Simulator</title>
+    
+    <!-- Meta & SEO -->
+    <meta name="description" content="Interaktive 3D-Physiksimulation zum Kettenkarussell, Zentripetalkraft, Trägheitskräften und rotierenden Bezugssystemen (Hommage & Modernisierung von Walter Fendt).">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Three.js CDN for 3D Viewport & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Top App Navigation Header -->
+        <header id="app-header">
+            <div class="header-left">
+                <a href="https://xallace.github.io/" class="back-link" title="Zurück zum Portfolio" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:6px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:inherit;text-decoration:none;margin-right:8px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                </a>
+                <div class="logo-mark">
+                    <svg viewBox="0 0 32 32" class="spin-icon">
+                        <circle cx="16" cy="16" r="13" stroke="currentColor" stroke-width="2" fill="none" stroke-dasharray="6 4"/>
+                        <circle cx="16" cy="16" r="4" fill="currentColor"/>
+                        <line x1="16" y1="16" x2="28" y2="8" stroke="currentColor" stroke-width="2"/>
+                        <circle cx="28" cy="8" r="3" fill="var(--accent-red)"/>
+                    </svg>
+                </div>
+                <div class="header-titles">
+                    <h1 data-i18n="app_title">KETTENKARUSSELL & ZENTRIPETALKRAFT</h1>
+                    <span class="sub" data-i18n="app_subtitle">Modellierung von Kreisbewegung, Seilspannung & rotierenden Bezugssystemen</span>
+                </div>
+            </div>
+
+            <div class="header-center">
+                <!-- Frame of Reference Toggle -->
+                <div class="segmented-control" role="group" aria-label="Bezugssystem">
+                    <button id="btn-frame-inertial" class="seg-btn active" onclick="setReferenceFrame('inertial')" data-i18n="frame_inertial">
+                        <span class="dot red"></span> Labor-System (Inertial)
+                    </button>
+                    <button id="btn-frame-rotating" class="seg-btn" onclick="setReferenceFrame('rotating')" data-i18n="frame_rotating">
+                        <span class="dot orange"></span> Rotierendes System (Zentrifugal)
+                    </button>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <div class="btn-group">
+                    <button id="btn-lang" class="icon-pill" onclick="toggleLanguage()" title="Sprache wechseln / Switch Language">
+                        🌐 <span id="lang-label">DE</span>
+                    </button>
+                    <button id="btn-theme" class="icon-pill" onclick="toggleTheme()" title="Theme wechseln">
+                        🌓
+                    </button>
+                    <button id="btn-sound" class="icon-pill" onclick="toggleSound()" title="Audio Toggle">
+                        🔊
+                    </button>
+                    <button id="btn-info" class="icon-pill" onclick="toggleTheoryModal()" title="Physikalische Grundlagen & Formeln">
+                        ℹ️ <span data-i18n="btn_theory">Theorie</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Grid Container -->
+        <main id="main-content">
+            <!-- Left 3D Viewport -->
+            <section id="viewport-container">
+                <div id="three-canvas-wrap">
+                    <!-- Three.js Canvas injected here -->
+                </div>
+
+                <!-- Floating 3D HUD & Controls -->
+                <div class="viewport-hud">
+                    <!-- View Camera Angles -->
+                    <div class="cam-presets">
+                        <span class="hud-label" data-i18n="cam_label">KAMERA:</span>
+                        <button class="cam-btn active" onclick="setCameraView('orbit')" data-i18n="cam_3d">3D Orbit</button>
+                        <button class="cam-btn" onclick="setCameraView('side')" data-i18n="cam_side">Seitenansicht (2D)</button>
+                        <button class="cam-btn" onclick="setCameraView('top')" data-i18n="cam_top">Draufsicht</button>
+                        <button class="cam-btn" onclick="setCameraView('rider')" data-i18n="cam_rider">Fahrgast-POV</button>
+                    </div>
+
+                    <!-- Animation State Controls -->
+                    <div class="playback-bar">
+                        <button id="btn-play" class="playback-btn" onclick="togglePlay()">
+                            <span id="play-icon">⏸️</span> <span id="play-text" data-i18n="btn_pause">Pause</span>
+                        </button>
+                        <button id="btn-slow" class="playback-btn" onclick="toggleSlowMo()">
+                            ⏱️ <span id="slow-text">1.0x</span>
+                        </button>
+                        <button class="playback-btn" onclick="resetSimulation()" data-i18n="btn_reset">
+                            🔄 Reset
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Real-time 2D Free-Body Diagram Overlay -->
+                <div id="vector-diagram-overlay">
+                    <div class="overlay-header">
+                        <span data-i18n="fbd_title">📐 KRÄFTEDIAGRAMM (FREIKÖRPERBILD)</span>
+                        <button class="mini-close" onclick="toggleVectorDiagram()">✕</button>
+                    </div>
+                    <canvas id="fbd-canvas" width="220" height="220"></canvas>
+                    <div class="fbd-legend">
+                        <div class="legend-item"><span class="color-box green"></span> <span data-i18n="leg_fg">Gewichtskraft F_g</span></div>
+                        <div class="legend-item"><span class="color-box blue"></span> <span data-i18n="leg_fs">Seilspannung F_S</span></div>
+                        <div class="legend-item"><span class="color-box red" id="leg-f-net-box"></span> <span id="leg-f-net-label" data-i18n="leg_fcp">Zentripetalkraft F_Z</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Sidebar: Interactive Controls & Live Physics Telemetry -->
+            <aside id="sidebar">
+                <!-- Preset Scenarios -->
+                <div class="panel-card">
+                    <div class="card-header">
+                        <h2 data-i18n="sec_presets">🎠 SZENARIEN & PRESETS</h2>
+                    </div>
+                    <div class="presets-grid">
+                        <button class="preset-chip active" onclick="loadPreset('classic')" data-i18n="pre_classic">Klassisch (Prater)</button>
+                        <button class="preset-chip" onclick="loadPreset('wave_swinger')" data-i18n="pre_wave">Wellenflug (High-G)</button>
+                        <button class="preset-chip" onclick="loadPreset('mini')" data-i18n="pre_mini">Kinderkarussell</button>
+                        <button class="preset-chip" onclick="loadPreset('moon')" data-i18n="pre_moon">Mond-Schwerkraft</button>
+                        <button class="preset-chip" onclick="loadPreset('jupiter')" data-i18n="pre_jupiter">Jupiter (Extrem-G)</button>
+                    </div>
+                </div>
+
+                <!-- Adjustable Parameters -->
+                <div class="panel-card">
+                    <div class="card-header">
+                        <h2 data-i18n="sec_parameters">⚙️ PARAMETER EINSTELLEN</h2>
+                    </div>
+
+                    <!-- Slider: Period T / RPM -->
+                    <div class="param-row">
+                        <div class="param-info">
+                            <label for="slider-period" data-i18n="param_period">Umlaufdauer T</label>
+                            <span class="param-val" id="val-period">4.00 s</span>
+                        </div>
+                        <div class="slider-wrap">
+                            <input type="range" id="slider-period" min="1.0" max="12.0" step="0.05" value="4.0" oninput="onParamChange()">
+                            <div class="range-ticks"><span>1 s</span><span>6 s</span><span>12 s</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Slider: Suspension Radius r0 -->
+                    <div class="param-row">
+                        <div class="param-info">
+                            <label for="slider-r0" data-i18n="param_r0">Aufhängungsradius r₀</label>
+                            <span class="param-val" id="val-r0">3.00 m</span>
+                        </div>
+                        <div class="slider-wrap">
+                            <input type="range" id="slider-r0" min="0.5" max="8.0" step="0.1" value="3.0" oninput="onParamChange()">
+                            <div class="range-ticks"><span>0.5 m</span><span>4.0 m</span><span>8.0 m</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Slider: Chain Length L -->
+                    <div class="param-row">
+                        <div class="param-info">
+                            <label for="slider-length" data-i18n="param_length">Seillänge L</label>
+                            <span class="param-val" id="val-length">5.00 m</span>
+                        </div>
+                        <div class="slider-wrap">
+                            <input type="range" id="slider-length" min="1.0" max="10.0" step="0.1" value="5.0" oninput="onParamChange()">
+                            <div class="range-ticks"><span>1.0 m</span><span>5.0 m</span><span>10.0 m</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Slider: Mass m -->
+                    <div class="param-row">
+                        <div class="param-info">
+                            <label for="slider-mass" data-i18n="param_mass">Masse des Sitzes m</label>
+                            <span class="param-val" id="val-mass">80.0 kg</span>
+                        </div>
+                        <div class="slider-wrap">
+                            <input type="range" id="slider-mass" min="10" max="250" step="1" value="80" oninput="onParamChange()">
+                            <div class="range-ticks"><span>10 kg</span><span>125 kg</span><span>250 kg</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Gravity Selector -->
+                    <div class="param-row">
+                        <div class="param-info">
+                            <label for="select-gravity" data-i18n="param_gravity">Fallbeschleunigung g</label>
+                            <span class="param-val" id="val-gravity">9.81 m/s²</span>
+                        </div>
+                        <select id="select-gravity" class="custom-select" onchange="onGravitySelect()">
+                            <option value="9.81" selected>Erde (9.81 m/s²)</option>
+                            <option value="1.62">Mond (1.62 m/s²)</option>
+                            <option value="3.71">Mars (3.71 m/s²)</option>
+                            <option value="24.79">Jupiter (24.79 m/s²)</option>
+                            <option value="custom">Benutzerdefiniert...</option>
+                        </select>
+                    </div>
+
+                    <!-- Vector Visual Toggles -->
+                    <div class="vector-toggles">
+                        <label class="toggle-chip">
+                            <input type="checkbox" id="chk-vec-fg" checked onchange="updateVectorVisibility()">
+                            <span class="chip-label"><span class="dot green"></span> F_g (Gewicht)</span>
+                        </label>
+                        <label class="toggle-chip">
+                            <input type="checkbox" id="chk-vec-fs" checked onchange="updateVectorVisibility()">
+                            <span class="chip-label"><span class="dot blue"></span> F_S (Seil)</span>
+                        </label>
+                        <label class="toggle-chip">
+                            <input type="checkbox" id="chk-vec-fnet" checked onchange="updateVectorVisibility()">
+                            <span class="chip-label"><span class="dot red"></span> F_Z / F_Zf</span>
+                        </label>
+                        <label class="toggle-chip">
+                            <input type="checkbox" id="chk-vec-v" checked onchange="updateVectorVisibility()">
+                            <span class="chip-label"><span class="dot yellow"></span> v (Geschw.)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Live Physics Telemetry Card -->
+                <div class="panel-card telemetry-card">
+                    <div class="card-header">
+                        <h2 data-i18n="sec_telemetry">📊 ECHTZEIT-PHYSIKDATEN</h2>
+                        <button class="btn-copy" onclick="exportDataCSV()" title="Daten als CSV exportieren" data-i18n="btn_export">📥 CSV</button>
+                    </div>
+
+                    <div class="telemetry-grid">
+                        <div class="telem-item highlight">
+                            <span class="t-label" data-i18n="t_angle">Auslenkwinkel α</span>
+                            <span class="t-value" id="res-alpha">0.00°</span>
+                            <span class="t-sub" id="res-alpha-rad">0.000 rad</span>
+                        </div>
+                        <div class="telem-item">
+                            <span class="t-label" data-i18n="t_radius">Bahnradius r</span>
+                            <span class="t-value" id="res-radius">0.00 m</span>
+                            <span class="t-sub">r = r₀ + L·sin(α)</span>
+                        </div>
+                        <div class="telem-item">
+                            <span class="t-label" data-i18n="t_speed">Bahngeschwindigkeit v</span>
+                            <span class="t-value" id="res-speed">0.00 m/s</span>
+                            <span class="t-sub" id="res-speed-kmh">0.0 km/h</span>
+                        </div>
+                        <div class="telem-item">
+                            <span class="t-label" data-i18n="t_omega">Winkelgeschw. ω</span>
+                            <span class="t-value" id="res-omega">0.00 rad/s</span>
+                            <span class="t-sub" id="res-rpm">0.0 RPM</span>
+                        </div>
+                        <div class="telem-item">
+                            <span class="t-label" data-i18n="t_acp">Zentripetalbeschl. a_Z</span>
+                            <span class="t-value" id="res-acp">0.00 m/s²</span>
+                            <span class="t-sub" id="res-gforce">0.00 g</span>
+                        </div>
+                        <div class="telem-item">
+                            <span class="t-label" data-i18n="t_fcp">Zentripetalkraft F_Z</span>
+                            <span class="t-value red" id="res-fcp">0 N</span>
+                            <span class="t-sub">m·ω²·r</span>
+                        </div>
+                        <div class="telem-item">
+                            <span class="t-label" data-i18n="t_fs">Seilzugkraft F_S</span>
+                            <span class="t-value blue" id="res-fs">0 N</span>
+                            <span class="t-sub">F_g / cos(α)</span>
+                        </div>
+                        <div class="telem-item">
+                            <span class="t-label" data-i18n="t_fg">Gewichtskraft F_g</span>
+                            <span class="t-value green" id="res-fg">0 N</span>
+                            <span class="t-sub">m·g</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <!-- Physics Theory & Mathematical Background Modal -->
+        <div id="theory-modal" class="modal-overlay hidden">
+            <div class="modal-card">
+                <div class="modal-top">
+                    <div class="modal-badge" data-i18n="theory_badge">WISSENSCHAFTLICHE HERLEITUNG</div>
+                    <h2 data-i18n="theory_title">Physikalische Grundlagen des Kettenkarussells</h2>
+                    <button class="modal-close" onclick="toggleTheoryModal()">✕</button>
+                </div>
+                <div class="modal-scroll-body">
+                    <section class="theory-sec">
+                        <h3 data-i18n="th_1_title">1. Kräftegleichgewicht & Winkelbestimmung</h3>
+                        <p data-i18n="th_1_desc">
+                            Auf einen Fahrgast der Masse $m$ wirken die vertikale Gewichtskraft $\vec{F}_g$ und die Seilzugkraft $\vec{F}_S$.
+                            In der Vertikalen herrscht Gleichgewicht:
+                        </p>
+                        <div class="math-box">
+                            $$F_S \cdot \cos(\alpha) = F_g = m \cdot g \implies F_S = \frac{m \cdot g}{\cos(\alpha)}$$
+                        </div>
+                        <p data-i18n="th_1_sub">
+                            Die horizontale Komponente der Seilspannung stellt exakt die für die Kreisbahn benötigte <strong>Zentripetalkraft $F_Z$</strong> bereit:
+                        </p>
+                        <div class="math-box">
+                            $$F_Z = F_S \cdot \sin(\alpha) = m \cdot \omega^2 \cdot r = m \cdot \omega^2 \cdot \left(r_0 + L \cdot \sin(\alpha)\right)$$
+                        </div>
+                    </section>
+
+                    <section class="theory-sec">
+                        <h3 data-i18n="th_2_title">2. Transzendente Bestimmungsgleichung für α</h3>
+                        <p data-i18n="th_2_desc">
+                            Durch Division der beiden Gleichungen ergibt sich:
+                        </p>
+                        <div class="math-box">
+                            $$\tan(\alpha) = \frac{F_Z}{F_g} = \frac{\omega^2 \cdot \left(r_0 + L \cdot \sin(\alpha)\right)}{g}$$
+                        </div>
+                        <p data-i18n="th_2_sub">
+                            Diese nichtlineare Gleichung wird in der Simulation für jeden Zeitschritt hochpräzise mit dem <strong>Newton-Raphson-Verfahren</strong> gelöst:
+                        </p>
+                        <div class="math-box">
+                            $$f(\alpha) = g \cdot \sin(\alpha) - \omega^2 \cdot \left(r_0 + L \cdot \sin(\alpha)\right) \cdot \cos(\alpha) = 0$$
+                        </div>
+                    </section>
+
+                    <section class="theory-sec">
+                        <h3 data-i18n="th_3_title">3. Inertialsystem vs. Rotierendes Bezugssystem</h3>
+                        <div class="comparison-grid">
+                            <div class="comp-box">
+                                <h4 class="red" data-i18n="th_inertial_head">Inertialsystem (Labor / Erdboden)</h4>
+                                <p data-i18n="th_inertial_p">
+                                    Der Beobachter ruht am Boden. Die Resultierende aus Gewichtskraft und Seilkraft beschleunigt den Körper permanent zum Zentrum hin (Zentripetalbeschleunigung $a_Z = \omega^2 r$).
+                                </p>
+                            </div>
+                            <div class="comp-box">
+                                <h4 class="orange" data-i18n="th_rotating_head">Rotierendes Bezugssystem (Fahrgast)</h4>
+                                <p data-i18n="th_rotating_p">
+                                    Der Beobachter dreht sich mit. In seinem System ruht der Sitz. Die Seilkraft wird durch die Trägheitskraft (Zentrifugalkraft $\vec{F}_{Zf} = -m\vec{\omega}\times(\vec{\omega}\times\vec{r})$) und $\vec{F}_g$ exakt ausbalanciert.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="theory-sec credits">
+                        <h4 data-i18n="th_credits_title">Über dieses Projekt</h4>
+                        <p data-i18n="th_credits_p">
+                            Diese Anwendung ist eine moderne, hochauflösende Neuimplementierung des klassischen Physik-Applets von <strong>Walter Fendt (1999/2014)</strong> mit vollständiger 3D-WebGL-Physik, prozeduraler Akustik, variablen Gravitationsfeldern und Vektordiagrammen.
+                        </p>
+                    </section>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-primary" onclick="toggleTheoryModal()" data-i18n="btn_close_theory">Verstanden & Schließen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Logic Modules -->
+    <script src="physics.js"></script>
+    <script src="carousel3d.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
